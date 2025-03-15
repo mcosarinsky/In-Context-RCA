@@ -21,7 +21,7 @@ def add_padding(img):
     padding = (pad_width, pad_height, delta_width - pad_width, delta_height - pad_height)
     return ImageOps.expand(img, padding)
 
-def process_img(path: pathlib.Path, size: int, is_seg: bool = False, grayscale: bool = True, transform: bool = True):
+def process_img(path: pathlib.Path, size: int, is_seg: bool = False, grayscale: bool = True):
     img = Image.open(path)
     resample_method = Image.NEAREST if is_seg else Image.BILINEAR
     
@@ -29,12 +29,11 @@ def process_img(path: pathlib.Path, size: int, is_seg: bool = False, grayscale: 
     img = add_padding(img)
     if img.size[0] != size or img.size[1] != size:
         img = img.resize((size, size), resample=resample_method) 
-    
-    if transform:
-        if grayscale or is_seg: 
-            img = img.convert('L')  # Convert image to grayscale
-        else:
-            img = img.convert('RGB')
+ 
+    if grayscale or is_seg: 
+        img = img.convert('L')  # Convert image to grayscale
+    else:
+        img = img.convert('RGB')
     img_np = np.array(img)
     
     return img_np

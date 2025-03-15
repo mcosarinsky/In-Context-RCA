@@ -20,11 +20,46 @@ This repository contains the code for the In-Context RCA project. It includes RC
 
 - **unet_segmentations**: Contains different quality segmentations generated with a UNet.
 - **src**: Contains the supported models along with scripts for preprocessing, generating the datasets and evaluation
-- **run_inference.py**: The script used to run the method.
+- **scripts**: Contains `run_inference.py` and `custom_inference.py` scripts for reproducing experiments and running the method on user's custom data.
+
+## Datasets
+The following datasets were used:
+
+- [SCD](https://www.cardiacatlas.org/sunnybrook-cardiac-data/)  
+- [HC18](https://zenodo.org/records/1327317)  
+- [PSFHS](https://zenodo.org/records/10969427)  
+- [JSRT](http://db.jsrt.or.jp/eng.php)  
+- [3D-IRCAdB](https://www.ircad.fr/research/data-sets/liver-segmentation-3d-ircadb-01/)  
+- [PH<sup>2</sup>](https://www.fc.up.pt/addi/ph2%20database.html)  
+- [NuCLS](https://sites.google.com/view/nucls/single-rater?authuser=0)  
+- [ISIC 2018](https://challenge.isic-archive.com/data/#2018)  
+- [WBC](https://data.mendeley.com/datasets/w7cvnmn4c5/1)
 
 ## Usage
 
-To run inference with the trained models, execute:
+To reproduce experiments on the datasets used in the paper, execute the following command with the `run_inference.py` script:
 
 ```bash
 python run_inference.py --dataset <dataset_path> --classifier <classifier_name> --output_file <output_file_path>
+```
+
+To run inference on your own data, you can use the `custom_inference.py` script:
+
+```bash
+python custom_inference.py --ref_dataset <reference_dataset_path> --eval_dataset <eval_data_path> --n_classes <num_of_classes> --classifier <classifier_name> --output_file <output_file_path> 
+```
+
+## Citation
+If you are using our masks please cite our work:
+
+```
+@misc{cosarinsky2025incontextreverseclassificationaccuracy,
+      title={In-Context Reverse Classification Accuracy: Efficient Estimation of Segmentation Quality without Ground-Truth}, 
+      author={Matias Cosarinsky and Ramiro Billot and Lucas Mansilla and Gabriel Gimenez and Nicolas Gaggión and Guanghui Fu and Enzo Ferrante},
+      year={2025},
+      eprint={2503.04522},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2503.04522}, 
+}
+```

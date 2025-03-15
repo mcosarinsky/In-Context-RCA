@@ -37,14 +37,18 @@ class AtlasRCA(BaseRCA):
         for sample in tqdm(d_eval):
             img = sample['image']
             seg = sample['seg']
-            label = sample['GT']
             
+            # Normalize when n_classes is 1
             if self.n_classes == 1:
                 seg = seg // seg.max()
-                label = label // label.max()
-
-            # Compute real score using base class method
-            real_score = self.evaluate(seg, label)
+            
+            if 'GT' in sample:
+                label = sample['GT']
+                if self.n_classes == 1:
+                    label = label // label.max()  # Normalize label
+                real_score = self.evaluate(seg, label)
+            else:
+                real_score = None
 
             # Select subset
             if self.emb_model is not None:
@@ -77,15 +81,19 @@ class UniverSegRCA(BaseRCA):
         for sample in tqdm(d_eval):
             img = sample['image']
             seg = sample['seg']
-            label = sample['GT']
 
-            # Compute real score using base class method
-            if self.n_classes > 1:
-                seg_np, label_np = torch.argmax(seg, dim=0).numpy(), torch.argmax(label, dim=0).numpy()
+            if 'GT' in sample:
+                label = sample['GT']
+                
+                # Compute real score using base class method
+                if self.n_classes > 1:
+                    seg_np, label_np = torch.argmax(seg, dim=0).numpy(), torch.argmax(label, dim=0).numpy()
+                else:
+                    seg_np, label_np = seg.numpy(), label.numpy()
+                real_score = self.evaluate(seg_np, label_np)
             else:
-                seg_np, label_np = seg.numpy(), label.numpy()
-            real_score = self.evaluate(seg_np, label_np)
-            
+                real_score = None
+
             # Select subset
             if self.emb_model is not None:
                 selected_subset = self.select_k_closest(d_reference, img, self.k)
@@ -117,14 +125,18 @@ class SAM2RCA(BaseRCA):
         for sample in tqdm(d_eval):
             img = sample['image']
             seg = sample['seg']
-            label = sample['GT']
 
-            # Compute real score using base class method
-            if self.n_classes > 1:
-                seg_np, label_np = np.argmax(seg, axis=0), np.argmax(label, axis=0)
+            if 'GT' in sample:
+                label = sample['GT']
+
+                # Compute real score using base class method
+                if self.n_classes > 1:
+                    seg_np, label_np = np.argmax(seg, axis=0), np.argmax(label, axis=0)
+                else:
+                    seg_np, label_np = seg, label
+                real_score = self.evaluate(seg_np, label_np)
             else:
-                seg_np, label_np = seg, label
-            real_score = self.evaluate(seg_np, label_np)
+                real_score = None
             
             # Select subset
             if self.emb_model is not None:

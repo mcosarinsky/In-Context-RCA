@@ -1,8 +1,8 @@
 import sys
-
 sys.path.append('sam2')
+
 import numpy as np
-from torch.utils.data import Subset, ConcatDataset
+from torch.utils.data import Subset
 import torchvision 
 import os
 import argparse
@@ -16,7 +16,6 @@ from src.datasets import *
 
 # Uncomment to avoid OpenMP library conflicts
 # os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" 
-
 
 def main():
     np.random.seed(1)
@@ -69,11 +68,7 @@ def main():
         transforms = torchvision.transforms.Compose(transforms_list)
     else:
         transforms_list = []
-        transform_img = True
-        if 'uls' in args.dataset:
-            transform_img = False
-            transforms_list.append(Scale())
-            
+
         if args.classifier == 'universeg':
             transforms_list.extend([ToTensor(), OneHot(n_classes=n_classes)])
         elif args.classifier == 'sam2':
@@ -84,9 +79,9 @@ def main():
     if args.dataset == 'jsrt':
         d_reference, d_eval = chestxray.get_jsrt_datasets(transforms)
     else:
-        grayscale = True #False if args.classifier == 'sam2' else True
-        d_reference = Seg2D_Dataset(split='Train', dataset=args.dataset, transform=transforms, grayscale=grayscale, target_size=target_size, transform_img=transform_img)
-        d_eval = Seg2D_Dataset(split='Test', dataset=args.dataset, transform=transforms, grayscale=grayscale, target_size=target_size, transform_img=transform_img)
+        grayscale = True 
+        d_reference = Seg2D_Dataset(split='Train', dataset=args.dataset, transform=transforms, grayscale=grayscale, target_size=target_size)
+        d_eval = Seg2D_Dataset(split='Test', dataset=args.dataset, transform=transforms, grayscale=grayscale, target_size=target_size)
 
         # Evaluate on a subset of the evaluation dataset with uniform distribution of scores
         d_eval_np = Seg2D_Dataset(split='Test', dataset=args.dataset, target_size=target_size)
@@ -113,7 +108,8 @@ def main():
 
     rca_clf = RCA(model=args.classifier, **rca_args)
     preds = rca_clf.run_evaluation(d_reference, d_eval)
-    to_json(preds, f"results/{args.output_file}")
+    
+    to_json(preds, args.output_file)
 
 if __name__ == "__main__":
     main()

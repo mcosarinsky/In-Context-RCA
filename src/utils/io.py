@@ -126,14 +126,6 @@ def load_test_folder(path: pathlib.Path, dataset: str):
         elif '3D-IRCADB' in dataset:
             idx = seg_file.name.split('_')
             idx = idx[0] + '/' + idx[1] + '_' + idx[2]
-        elif dataset == 'PANCREAS-CT':
-            idx = seg_file.name.split('_') 
-            idx = idx[0] + '_' + idx[1] + '/' + idx[2]
-        elif 'ULS' in dataset:
-            name = seg_file.name
-            name = name.split('_epoch')[0]
-            name_parts = name.split('_')
-            idx = '_'.join(name_parts[:-1]) + '/' + name_parts[-1]
         else:
             idx = seg_file.name.split('_')[0]
         
