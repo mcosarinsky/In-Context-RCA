@@ -1,5 +1,6 @@
 env/
 sam2/
+!segment-anything-2/sam2/
 results/
 datasets/
 !src/datasets/
