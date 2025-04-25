@@ -6,7 +6,6 @@ sam2_dir = os.path.join(parent_dir, 'sam2')
 sys.path.extend([parent_dir, sam2_dir])
 
 import numpy as np
-from torch.utils.data import Subset
 import torchvision 
 import argparse
 import json
@@ -85,12 +84,6 @@ def main():
         grayscale = True 
         d_reference = Seg2D_Dataset(split='Train', dataset=args.dataset, transform=transforms, grayscale=grayscale, target_size=target_size)
         d_eval = Seg2D_Dataset(split='Test', dataset=args.dataset, transform=transforms, grayscale=grayscale, target_size=target_size)
-
-        # Evaluate on a subset of the evaluation dataset with uniform distribution of scores
-        d_eval_np = Seg2D_Dataset(split='Test', dataset=args.dataset, target_size=target_size)
-        scores_eval = compute_scores(d_eval_np, n_classes)[:, 0]
-        idxs_eval = sample_N(scores_eval, args.n_eval, n_buckets=5) 
-        d_eval = Subset(d_eval, idxs_eval)
 
     rca_args = {'eval_metrics': ['Dice', 'Hausdorff', 'ASSD'],
                 'n_test': args.n_test,
