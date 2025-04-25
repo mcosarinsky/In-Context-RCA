@@ -1,10 +1,13 @@
 import sys
-sys.path.append('sam2')
+import os
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sam2_dir = os.path.join(parent_dir, 'sam2')
+sys.path.extend([parent_dir, sam2_dir])
 
 import numpy as np
 from torch.utils.data import Subset
 import torchvision 
-import os
 import argparse
 import json
 
