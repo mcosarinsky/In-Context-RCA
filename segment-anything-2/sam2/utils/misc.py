@@ -11,7 +11,6 @@ from threading import Thread
 import numpy as np
 import torch
 from PIL import Image
-from tqdm import tqdm
 
 
 def get_sdpa_settings():
@@ -123,6 +122,24 @@ def _load_img_as_tensor(img_path, image_size):
     return img, video_height, video_width
 
 
+def _load_np_as_tensor(np_img, image_size):
+    if np_img.ndim == 2:
+        np_img = np.expand_dims(np_img, axis=0)  # Grayscale image: (H, W) -> (1, H, W)
+        np_img = np.repeat(np_img, 3, axis=0)  # (3, H, W)
+
+    pil_img = Image.fromarray(np_img.transpose(1, 2, 0))  # Convert back to (H, W, 3)
+    pil_img_resized = pil_img.resize((image_size, image_size))
+    img_np = np.array(pil_img_resized)
+
+    if img_np.dtype == np.uint8:  # np.uint8 is expected for standard images
+        img_np = img_np / 255.0
+    else:
+        raise RuntimeError(f"Unknown image dtype: {img_np.dtype}")
+
+    img_tensor = torch.from_numpy(img_np).permute(2, 0, 1)
+    return img_tensor, pil_img.size[1], pil_img.size[0]
+
+
 class AsyncVideoFrameLoader:
     """
     A list of video frames to be load asynchronously without blocking session start.
@@ -158,7 +175,7 @@ class AsyncVideoFrameLoader:
         # load the rest of frames asynchronously without blocking the session start
         def _load_frames():
             try:
-                for n in tqdm(range(len(self.images)), desc="frame loading (JPEG)"):
+                for n in range(len(self.images)):
                     self.__getitem__(n)
             except Exception as e:
                 self.exception = e
@@ -265,7 +282,7 @@ def load_video_frames_from_jpg_images(
     frame_names = [
         p
         for p in os.listdir(jpg_folder)
-        if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
+        if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG", ".png", ".PNG"]
     ]
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
     num_frames = len(frame_names)
@@ -287,7 +304,7 @@ def load_video_frames_from_jpg_images(
         return lazy_images, lazy_images.video_height, lazy_images.video_width
 
     images = torch.zeros(num_frames, 3, image_size, image_size, dtype=torch.float32)
-    for n, img_path in enumerate(tqdm(img_paths, desc="frame loading (JPEG)")):
+    for n, img_path in enumerate(img_paths):
         images[n], video_height, video_width = _load_img_as_tensor(img_path, image_size)
     if not offload_video_to_cpu:
         images = images.to(compute_device)
@@ -331,6 +348,40 @@ def load_video_frames_from_video_file(
     return images, video_height, video_width
 
 
+def load_video_frames_by_np_data(
+    np_images,
+    image_size,
+    offload_video_to_cpu,
+    img_mean=(0.485, 0.456, 0.406),
+    img_std=(0.229, 0.224, 0.225),
+    compute_device=torch.device("cuda"),
+):
+    """
+    Load the video frames from a NumPy array of shape:
+        - (N, H, W, 3) for RGB
+        - (N, H, W) for grayscale
+    """
+    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
+    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
+
+    num_frames = np_images.shape[0]
+    images = torch.zeros(num_frames, 3, image_size, image_size, dtype=torch.float32)
+
+    for n in range(num_frames):
+        images[n], video_height, video_width = _load_np_as_tensor(np_images[n], image_size)  # Load each frame and process it
+
+    if not offload_video_to_cpu:
+        images = images.to(compute_device)
+        img_mean = torch.tensor(img_mean, dtype=torch.float32).to(compute_device)
+        img_std = torch.tensor(img_std, dtype=torch.float32).to(compute_device)
+
+    # Normalize the images by mean and std
+    images -= img_mean
+    images /= img_std
+
+    return images, video_height, video_width
+
+
 def fill_holes_in_mask_scores(mask, max_area):
     """
     A post processor to fill small holes in mask scores with area under `max_area`.
@@ -369,55 +420,3 @@ def concat_points(old_point_inputs, new_points, new_labels):
         labels = torch.cat([old_point_inputs["point_labels"], new_labels], dim=1)
 
     return {"point_coords": points, "point_labels": labels}
-
-
-def load_video_frames_by_np_data(
-    np_images,
-    image_size,
-    offload_video_to_cpu,
-    img_mean=(0.485, 0.456, 0.406),
-    img_std=(0.229, 0.224, 0.225),
-    compute_device=torch.device("cuda"),
-):
-    """
-    Load the video frames from a NumPy array of shape:
-        - (N, H, W, 3) for RGB
-        - (N, H, W) for grayscale
-
-    Frames are resized to (image_size, image_size), normalized, and moved to device if needed.
-    Output always has 3 channels.
-    """
-    num_frames = np_images.shape[0]
-    video_height, video_width = np_images.shape[1:3]
-
-    if np_images.ndim == 4 and np_images.shape[-1] == 3:
-        np_images = np_images.transpose(0, 3, 1, 2) # RGB image: (N, H, W, 3) -> (N, 3, H, W)
-    elif np_images.ndim == 3:
-        np_images = np_images[:, None, :, :] # Grayscale image: (N, H, W) -> (N, 1, H, W)
-        np_images = np.repeat(np_images, 3, axis=1) # Get 3 channels
-    else:
-        raise ValueError(f"Unsupported np_images shape: {np_images.shape}")
-
-    # Convert to torch tensor and resize
-    images_tensor = torch.from_numpy(np_images).float()  # shape: (N, 3, H, W)
-    images_resized = torch.nn.functional.interpolate(
-        images_tensor,
-        size=(image_size, image_size),
-        mode='bilinear',
-        align_corners=False
-    )
-
-    # Normalize
-    img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
-    img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
-
-    if not offload_video_to_cpu:
-        images_resized = images_resized.to(compute_device)
-        img_mean = img_mean.to(compute_device)
-        img_std = img_std.to(compute_device)
-
-    images_resized -= img_mean
-    images_resized /= img_std
-
-    return images_resized, video_height, video_width
-
